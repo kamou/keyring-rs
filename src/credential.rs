@@ -8,6 +8,7 @@ and [CredentialApi] for the entries in the store.  These traits must be implemen
 in a thread-safe way, a requirement captured in the [CredentialBuilder] and
 [Credential] types that wrap them.
  */
+use secrecy::{SecretBox, SecretString};
 use std::any::Any;
 use std::collections::HashMap;
 
@@ -29,13 +30,13 @@ pub trait CredentialApi {
     ///
     /// This has no effect on the underlying store. If there is no credential
     /// for this entry, a [NoEntry](crate::Error::NoEntry) error is returned.
-    fn get_password(&self) -> Result<String>;
+    fn get_password(&self) -> Result<SecretString>;
 
     /// Retrieve a secret (a byte array) from the credential.
     ///
     /// This has no effect on the underlying store. If there is no credential
     /// for this entry, a [NoEntry](crate::Error::NoEntry) error is returned.
-    fn get_secret(&self) -> Result<Vec<u8>>;
+    fn get_secret(&self) -> Result<SecretBox<Vec<u8>>>;
 
     /// Get the secure store attributes on this entry's credential.
     ///

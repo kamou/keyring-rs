@@ -33,6 +33,7 @@ entry.set_password("test").expect_err("error will override");
 entry.set_password("test").expect("error has been cleared");
 ```
  */
+use secrecy::{ExposeSecret, ExposeSecretMut, SecretBox, SecretString};
 use std::cell::RefCell;
 use std::sync::Mutex;
 
@@ -67,7 +68,7 @@ impl Default for MockCredential {
 /// Most keystore implementation hide their internals.)
 #[derive(Debug, Default)]
 pub struct MockData {
-    pub secret: Option<Vec<u8>>,
+    pub secret: Option<SecretBox<Vec<u8>>>,
     pub error: Option<Error>,
 }
 
@@ -83,7 +84,7 @@ impl CredentialApi for MockCredential {
         let err = data.error.take();
         match err {
             None => {
-                data.secret = Some(password.as_bytes().to_vec());
+                data.secret = Some(SecretBox::new(Box::new(password.as_bytes().to_vec())));
                 Ok(())
             }
             Some(err) => Err(err),
@@ -101,7 +102,7 @@ impl CredentialApi for MockCredential {
         let err = data.error.take();
         match err {
             None => {
-                data.secret = Some(secret.to_vec());
+                data.secret = Some(SecretBox::new(Box::new(secret.to_vec())));
                 Ok(())
             }
             Some(err) => Err(err),
@@ -112,14 +113,14 @@ impl CredentialApi for MockCredential {
     ///
     /// If there is an error set in the mock, it will
     /// be returned instead of a password.
-    fn get_password(&self) -> Result<String> {
+    fn get_password(&self) -> Result<SecretString> {
         let mut inner = self.inner.lock().expect("Can't access mock data for get");
         let data = inner.get_mut();
         let err = data.error.take();
         match err {
             None => match &data.secret {
                 None => Err(Error::NoEntry),
-                Some(val) => decode_password(val.clone()),
+                Some(val) => decode_password(val),
             },
             Some(err) => Err(err),
         }
@@ -129,14 +130,14 @@ impl CredentialApi for MockCredential {
     ///
     /// If there is an error set in the mock, it will
     /// be returned instead of a password.
-    fn get_secret(&self) -> Result<Vec<u8>> {
+    fn get_secret(&self) -> Result<SecretBox<Vec<u8>>> {
         let mut inner = self.inner.lock().expect("Can't access mock data for get");
         let data = inner.get_mut();
         let err = data.error.take();
         match err {
             None => match &data.secret {
                 None => Err(Error::NoEntry),
-                Some(val) => Ok(val.clone()),
+                Some(val) => Ok(SecretBox::new(Box::new(val.expose_secret().clone()))),
             },
             Some(err) => Err(err),
         }

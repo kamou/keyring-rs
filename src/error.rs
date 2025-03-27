@@ -11,6 +11,7 @@ is not much of a burden on the platform-specific store providers.)
  */
 
 use crate::Credential;
+use secrecy::{ExposeSecret, SecretBox, SecretString};
 
 #[derive(Debug)]
 /// Each variant of the `Error` enum provides a summary of the error.
@@ -105,8 +106,11 @@ impl std::error::Error for Error {
 }
 
 /// Try to interpret a byte vector as a password string
-pub fn decode_password(bytes: Vec<u8>) -> Result<String> {
-    String::from_utf8(bytes).map_err(|err| Error::BadEncoding(err.into_bytes()))
+pub fn decode_password(bytes: &SecretBox<Vec<u8>>) -> Result<SecretString> {
+    Ok(SecretString::from(
+        String::from_utf8(bytes.expose_secret().clone())
+            .map_err(|err| Error::BadEncoding(err.into_bytes()))?,
+    ))
 }
 
 #[cfg(test)]

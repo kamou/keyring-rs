@@ -84,6 +84,7 @@ use dbus_secret_service::{Collection, EncryptionType, Error, Item, SecretService
 
 use super::credential::{Credential, CredentialApi, CredentialBuilder, CredentialBuilderApi};
 use super::error::{Error as ErrorCode, Result, decode_password};
+use secrecy::{ExposeSecret, SecretBox, SecretString};
 
 /// The representation of an item in the secret-service.
 ///
@@ -158,8 +159,8 @@ impl CredentialApi for SsCredential {
     /// If there are multiple matches,
     /// returns an [Ambiguous](ErrorCode::Ambiguous)
     /// error with a credential for each matching item.
-    fn get_password(&self) -> Result<String> {
-        let passwords: Vec<String> = self.map_matching_items(get_item_password, true)?;
+    fn get_password(&self) -> Result<SecretString> {
+        let passwords: Vec<SecretString> = self.map_matching_items(get_item_password, true)?;
         Ok(passwords[0].clone())
     }
 
@@ -170,9 +171,10 @@ impl CredentialApi for SsCredential {
     /// If there are multiple matches,
     /// returns an [Ambiguous](ErrorCode::Ambiguous)
     /// error with a credential for each matching item.
-    fn get_secret(&self) -> Result<Vec<u8>> {
-        let secrets: Vec<Vec<u8>> = self.map_matching_items(get_item_secret, true)?;
-        Ok(secrets[0].clone())
+    fn get_secret(&self) -> Result<SecretBox<Vec<u8>>> {
+        let secrets: Vec<SecretBox<Vec<u8>>> = self.map_matching_items(get_item_secret, true)?;
+        let new_secret = SecretBox::new(Box::new(secrets[0].expose_secret().to_vec()));
+        Ok(new_secret)
     }
 
     /// Get attributes on a unique matching item, if it exists
@@ -288,7 +290,7 @@ impl SsCredential {
     ///
     /// (This is useful if [get_password](SsCredential::get_password)
     /// returns an [Ambiguous](ErrorCode::Ambiguous) error.)
-    pub fn get_all_passwords(&self) -> Result<Vec<String>> {
+    pub fn get_all_passwords(&self) -> Result<Vec<SecretString>> {
         self.map_matching_items(get_item_password, false)
     }
 
@@ -500,15 +502,17 @@ pub fn set_item_secret(item: &Item, secret: &[u8]) -> Result<()> {
 }
 
 /// Given an existing item, retrieve and decode its password.
-pub fn get_item_password(item: &Item) -> Result<String> {
+pub fn get_item_password(item: &Item) -> Result<SecretString> {
     let bytes = item.get_secret().map_err(decode_error)?;
-    decode_password(bytes)
+    let secret_bytes = SecretBox::new(Box::new(bytes));
+    decode_password(&secret_bytes)
 }
 
 /// Given an existing item, retrieve its secret.
-pub fn get_item_secret(item: &Item) -> Result<Vec<u8>> {
+pub fn get_item_secret(item: &Item) -> Result<SecretBox<Vec<u8>>> {
     let secret = item.get_secret().map_err(decode_error)?;
-    Ok(secret)
+    let real_secret = SecretBox::new(Box::new(secret));
+    Ok(real_secret)
 }
 
 /// Given an existing item, retrieve its non-controlled attributes.

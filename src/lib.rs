@@ -166,6 +166,7 @@ use std::collections::HashMap;
 
 pub use credential::{Credential, CredentialBuilder};
 pub use error::{Error, Result};
+use secrecy::{SecretBox, SecretString};
 
 pub mod mock;
 
@@ -341,7 +342,7 @@ impl Entry {
     /// that matches this entry.  This can only happen
     /// on some platforms, and then only if a third-party
     /// application wrote the ambiguous credential.
-    pub fn get_password(&self) -> Result<String> {
+    pub fn get_password(&self) -> Result<SecretString> {
         debug!("get password from entry {:?}", self.inner);
         self.inner.get_password()
     }
@@ -355,7 +356,7 @@ impl Entry {
     /// that matches this entry.  This can only happen
     /// on some platforms, and then only if a third-party
     /// application wrote the ambiguous credential.
-    pub fn get_secret(&self) -> Result<Vec<u8>> {
+    pub fn get_secret(&self) -> Result<SecretBox<Vec<u8>>> {
         debug!("get secret from entry {:?}", self.inner);
         self.inner.get_secret()
     }
